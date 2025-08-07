@@ -9,3 +9,6 @@ requests
 python-dotenv
 duckduckgo-search
 fuzzywuzzy
+pygetwindow
+pywin32; sys_platform == "win32"
+python-levenshtein
