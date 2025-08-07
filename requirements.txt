@@ -9,3 +9,4 @@ requests
 python-dotenv
 duckduckgo-search
 fuzzywuzzy
+python-Levenshtein
