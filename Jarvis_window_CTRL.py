@@ -28,19 +28,37 @@ sys.stdout.reconfigure(encoding='utf-8')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# App command map
-APP_MAPPINGS = {
-    "notepad": "notepad",
-    "calculator": "calc",
-    "chrome": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "vlc": "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
-    "command prompt": "cmd",
-    "control panel": "control",
-    "settings": "start ms-settings:",
-    "paint": "mspaint",
-    "vs code": "C:\\Users\\gaura\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
-    "postman": "C:\\Users\\gaura\\AppData\\Local\\Postman\\Postman.exe"
-}
+# App command map - Cross-platform
+if os.name == 'nt':  # Windows
+    APP_MAPPINGS = {
+        "notepad": "notepad",
+        "calculator": "calc",
+        "chrome": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "vlc": "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
+        "command prompt": "cmd",
+        "control panel": "control",
+        "settings": "start ms-settings:",
+        "paint": "mspaint",
+        "vs code": "C:\\Users\\gaura\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
+        "postman": "C:\\Users\\gaura\\AppData\\Local\\Postman\\Postman.exe"
+    }
+else:  # Linux/Unix
+    APP_MAPPINGS = {
+        "notepad": "gedit",
+        "text editor": "gedit",
+        "calculator": "gnome-calculator",
+        "chrome": "google-chrome",
+        "firefox": "firefox",
+        "vlc": "vlc",
+        "terminal": "gnome-terminal",
+        "file manager": "nautilus",
+        "vs code": "code",
+        "vscode": "code",
+        "libreoffice": "libreoffice",
+        "writer": "libreoffice --writer",
+        "calc": "libreoffice --calc",
+        "impress": "libreoffice --impress"
+    }
 
 # -------------------------
 # Global focus utility
@@ -89,17 +107,31 @@ async def search_item(query, index, item_type):
 # File/folder actions
 async def open_folder(path):
     try:
-        os.startfile(path) if os.name == 'nt' else subprocess.call(['xdg-open', path])
+        if os.name == 'nt':  # Windows
+            os.startfile(path)
+        elif sys.platform == 'darwin':  # macOS
+            subprocess.call(['open', path])
+        else:  # Linux
+            subprocess.call(['xdg-open', path])
         await focus_window(os.path.basename(path))
+        logger.info(f"✅ Folder opened: {path}")
     except Exception as e:
         logger.error(f"❌ फ़ाइल open करने में error आया। {e}")
+        raise
 
 async def play_file(path):
     try:
-        os.startfile(path) if os.name == 'nt' else subprocess.call(['xdg-open', path])
+        if os.name == 'nt':  # Windows
+            os.startfile(path)
+        elif sys.platform == 'darwin':  # macOS
+            subprocess.call(['open', path])
+        else:  # Linux
+            subprocess.call(['xdg-open', path])
         await focus_window(os.path.basename(path))
+        logger.info(f"✅ File opened: {path}")
     except Exception as e:
         logger.error(f"❌ फ़ाइल open करने में error आया।: {e}")
+        raise
 
 async def create_folder(path):
     try:
@@ -130,14 +162,25 @@ async def delete_item(path):
 async def open(app_title: str) -> str:
     app_title = app_title.lower().strip()
     app_command = APP_MAPPINGS.get(app_title, app_title)
+    
     try:
-        await asyncio.create_subprocess_shell(f'start "" "{app_command}"', shell=True)
+        if os.name == 'nt':  # Windows
+            await asyncio.create_subprocess_shell(f'start "" "{app_command}"', shell=True)
+        else:  # Linux/Unix
+            # Use nohup to prevent the process from being killed when terminal closes
+            await asyncio.create_subprocess_shell(f'nohup {app_command} > /dev/null 2>&1 &', shell=True)
+        
+        # Give the app time to start
+        await asyncio.sleep(2)
+        
         focused = await focus_window(app_title)
         if focused:
             return f"🚀 App launch हुआ और focus में है: {app_title}."
         else:
+            logger.info(f"App {app_title} launched but couldn't focus window")
             return f"🚀 {app_title} Launch किया गया, लेकिन window पर focus नहीं हो पाया।"
     except Exception as e:
+        logger.error(f"Error launching {app_title}: {e}")
         return f"❌ {app_title} Launch नहीं हो पाया।: {e}"
 
 @function_tool
@@ -156,7 +199,13 @@ async def close(window_title: str) -> str:
 # Jarvis command logic
 @function_tool
 async def folder_file(command: str) -> str:
-    folders_to_index = ["D:/"]
+    # Cross-platform folder indexing
+    if os.name == 'nt':  # Windows
+        folders_to_index = ["D:/", "C:/Users"]
+    else:  # Linux/Unix
+        home_dir = os.path.expanduser("~")
+        folders_to_index = [home_dir, "/usr/share/applications", "/home"]
+    
     index = await index_items(folders_to_index)
     command_lower = command.lower()
 

@@ -64,10 +64,15 @@ async def search_file(query, index):
 async def open_file(item):
     try:
         logger.info(f"📂 File खोल रहे हैं: {item['path']}")
-        if os.name == 'nt':
+        if os.name == 'nt':  # Windows
             os.startfile(item["path"])
-        else:
-            subprocess.call(['open' if sys.platform == 'darwin' else 'xdg-open', item["path"]])
+        elif sys.platform == 'darwin':  # macOS
+            subprocess.call(['open', item["path"]])
+        else:  # Linux
+            subprocess.call(['xdg-open', item["path"]])
+        
+        # Give time for the application to open
+        await asyncio.sleep(1)
         await focus_window(item["name"])  # 👈 Focus window after opening
         return f"✅ File open हो गई।: {item['name']}"
     except Exception as e:
@@ -84,7 +89,13 @@ async def handle_command(command, index):
 
 @function_tool
 async def Play_file(name: str) -> str:
-    folders_to_index = ["D:/"]
+    # Cross-platform folder indexing
+    if os.name == 'nt':  # Windows
+        folders_to_index = ["D:/", "C:/Users"]
+    else:  # Linux/Unix
+        home_dir = os.path.expanduser("~")
+        folders_to_index = [home_dir, "/usr/share/applications", "/home"]
+    
     index = await index_files(folders_to_index)
     command = name.strip()
     return await handle_command(command, index)
